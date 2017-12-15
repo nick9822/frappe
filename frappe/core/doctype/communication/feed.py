@@ -3,12 +3,13 @@
 
 from __future__ import unicode_literals
 import frappe
-import frappe.defaults
 import frappe.permissions
 from frappe.model.document import Document
 from frappe.utils import get_fullname
 from frappe import _
 from frappe.core.doctype.communication.comment import add_info_comment
+from frappe.core.doctype.authentication_log.authentication_log import add_authentication_log
+from six import string_types
 
 def update_feed(doc, method=None):
 	"adds a new communication with comment_type='Updated'"
@@ -25,7 +26,7 @@ def update_feed(doc, method=None):
 		feed = doc.get_feed()
 
 		if feed:
-			if isinstance(feed, basestring):
+			if isinstance(feed, string_types):
 				feed = {"subject": feed}
 
 			feed = frappe._dict(feed)
@@ -53,17 +54,21 @@ def update_feed(doc, method=None):
 			}).insert(ignore_permissions=True)
 
 def login_feed(login_manager):
-	add_info_comment(**{
-		"subject": _("{0} logged in").format(get_fullname(login_manager.user)),
-		"full_name": get_fullname(login_manager.user)
-	})
+	if login_manager.user != "Guest":
+		subject = _("{0} logged in").format(get_fullname(login_manager.user))
+		add_authentication_log(subject, login_manager.user)
+
+def logout_feed(user, reason):
+	if user and user != "Guest":
+		subject = _("{0} logged out: {1}").format(get_fullname(user), frappe.bold(reason))
+		add_authentication_log(subject, user, operation="Logout")
 
 def get_feed_match_conditions(user=None, force=True):
 	if not user: user = frappe.session.user
 
 	conditions = ['`tabCommunication`.owner="{user}" or `tabCommunication`.reference_owner="{user}"'.format(user=frappe.db.escape(user))]
 
-	user_permissions = frappe.defaults.get_user_permissions(user)
+	user_permissions = frappe.permissions.get_user_permissions(user)
 	can_read = frappe.get_user().get_can_read()
 
 	can_read_doctypes = ['"{}"'.format(doctype) for doctype in
