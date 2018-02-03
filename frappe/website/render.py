@@ -33,7 +33,7 @@ def render(path=None, http_status_code=None):
 		data = render_page('404')
 		http_status_code = 404
 	elif is_static_file(path):
-		return get_static_file_reponse()
+		return get_static_file_response()
 	else:
 		try:
 			data = render_page_by_language(path)
@@ -80,7 +80,7 @@ def is_static_file(path):
 	if ('.' not in path):
 		return False
 	extn = path.rsplit('.', 1)[-1]
-	if extn in ('html', 'md', 'js', 'xml', 'css', 'txt'):
+	if extn in ('html', 'md', 'js', 'xml', 'css', 'txt', 'py'):
 		return False
 
 	for app in frappe.get_installed_apps():
@@ -91,7 +91,7 @@ def is_static_file(path):
 
 	return False
 
-def get_static_file_reponse():
+def get_static_file_response():
 	try:
 		f = open(frappe.flags.file_path, 'rb')
 	except IOError:

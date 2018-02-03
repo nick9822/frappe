@@ -247,11 +247,23 @@ frappe.ui.Page = Class.extend({
 
 	//-- Generic --//
 
+	/*
+	* Add label to given drop down menu. If label, is already contained in the drop
+	* down menu, it will be ignored.
+	* @param {string} label - Text for the drop down menu
+	* @param {function} click - function to be called when `label` is clicked
+	* @param {Boolean} standard
+	* @param {object} parent - DOM object representing the parent of the drop down item lists
+	*/
 	add_dropdown_item: function(label, click, standard, parent) {
+		let item_selector = 'li > a.grey-link';
+
 		parent.parent().removeClass("hide");
 
 		var $li = $('<li><a class="grey-link">'+ label +'</a><li>'),
 			$link = $li.find("a").on("click", click);
+
+		if (this.is_in_group_button_dropdown(parent, item_selector, label)) return;
 
 		if(standard===true) {
 			$li.appendTo(parent);
@@ -266,6 +278,24 @@ frappe.ui.Page = Class.extend({
 		return $link;
 	},
 
+	/*
+	* Check if there already exists a button with a specified label in a specified button group
+	* @param {object} parent - This should be the `ul` of the button group.
+	* @param {string} selector - CSS Selector of the button to be searched for. By default, it is `li`.
+	* @param {string} label - Label of the button
+	*/
+	is_in_group_button_dropdown: function(parent, selector, label){
+		if (!selector) selector = 'li';
+
+		if (!label || !parent) return false;
+
+		const result = $(parent).find(`${selector}:contains('${label}')`)
+			.filter(function() {
+				return $(this).text() === label;
+			});
+		return result.length > 0;
+	},
+
 	clear_btn_group: function(parent) {
 		parent.empty();
 		parent.parent().addClass("hide");
@@ -275,7 +305,7 @@ frappe.ui.Page = Class.extend({
 		return $('<li class="divider"></li>').appendTo(this.menu);
 	},
 
-	get_inner_group_button: function(label) {
+	get_or_add_inner_group_button: function(label) {
 		var $group = this.inner_toolbar.find('.btn-group[data-label="'+label+'"]');
 		if(!$group.length) {
 			$group = $('<div class="btn-group" data-label="'+label+'" style="margin-left: 10px;">\
@@ -286,8 +316,12 @@ frappe.ui.Page = Class.extend({
 		return $group;
 	},
 
+	get_inner_group_button: function(label) {
+		return this.inner_toolbar.find('.btn-group[data-label="'+label+'"]');
+	},
+
 	set_inner_btn_group_as_primary: function(label) {
-		this.get_inner_group_button(label).find("button").removeClass("btn-default").addClass("btn-primary");
+		this.get_or_add_inner_group_button(label).find("button").removeClass("btn-default").addClass("btn-primary");
 	},
 
 	btn_disable_enable: function(btn, response) {
@@ -304,6 +338,15 @@ frappe.ui.Page = Class.extend({
 		}
 	},
 
+	/*
+	* Add button to button group. If there exists another button with the same label,
+	* `add_inner_button` will not add the new button to the button group even if the callback
+	* function is different.
+	*
+	* @param {string} label - Label of the button to be added to the group
+	* @param {object} action - function to be called when button is clicked
+	* @param {string} group - Label of the group button
+	*/
 	add_inner_button: function(label, action, group) {
 		var me = this;
 		let _action = function() {
@@ -312,15 +355,42 @@ frappe.ui.Page = Class.extend({
 			me.btn_disable_enable(btn, response);
 		};
 		if(group) {
-			var $group = this.get_inner_group_button(group);
+			var $group = this.get_or_add_inner_group_button(group);
 			$(this.inner_toolbar).removeClass("hide");
-			return $('<li><a>'+label+'</a></li>')
-				.on('click', _action)
-				.appendTo($group.find(".dropdown-menu"));
+
+			if (!this.is_in_group_button_dropdown($group.find(".dropdown-menu"), 'li', label)) {
+				return $('<li><a>'+label+'</a></li>')
+					.on('click', _action)
+					.appendTo($group.find(".dropdown-menu"));
+			}
+
 		} else {
 			return $('<button class="btn btn-default btn-xs" style="margin-left: 10px;">'+__(label)+'</btn>')
 				.on("click", _action)
 				.appendTo(this.inner_toolbar.removeClass("hide"));
+		}
+	},
+
+	remove_inner_button: function(label, group) {
+		if (typeof label === 'string') {
+			label = [label];
+		}
+		// translate
+		label = label.map(l => __(l));
+
+		if (group) {
+			var $group = this.get_inner_group_button(__(group));
+			if($group.length) {
+				$group.find('.dropdown-menu li a')
+					.filter((i, btn) => label.includes($(btn).text()))
+					.remove();
+			}
+			if ($group.find('.dropdown-menu li a').length === 0) $group.remove();
+		} else {
+
+			this.inner_toolbar.find('button')
+				.filter((i, btn) =>  label.includes($(btn).text()))
+				.remove();
 		}
 	},
 

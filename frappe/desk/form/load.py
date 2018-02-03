@@ -94,6 +94,7 @@ def get_docinfo(doc=None, doctype=None, name=None):
 	frappe.response["docinfo"] = {
 		"attachments": get_attachments(doc.doctype, doc.name),
 		"communications": _get_communications(doc.doctype, doc.name),
+		'total_comments': len(json.loads(doc.get('_comments') or '[]')),
 		'versions': get_versions(doc),
 		"assignments": get_assignments(doc.doctype, doc.name),
 		"permissions": get_doc_permissions(doc),
@@ -137,7 +138,7 @@ def get_communication_data(doctype, name, start=0, limit=20, after=None, fields=
 	'''Returns list of communications for a given document'''
 	if not fields:
 		fields = '''name, communication_type,
-			communication_medium, comment_type,
+			communication_medium, comment_type, communication_date,
 			content, sender, sender_full_name, creation, subject, delivery_status, _liked_by,
 			timeline_doctype, timeline_name,
 			reference_doctype, reference_name,

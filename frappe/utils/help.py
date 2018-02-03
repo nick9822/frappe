@@ -33,6 +33,23 @@ def get_help(text):
 def get_help_content(path):
 	return HelpDatabase().get_content(path)
 
+def get_improve_page_html(app_name, target):
+	docs_config = frappe.get_module(app_name + ".config.docs")
+	source_link = docs_config.source_link
+	branch = getattr(docs_config, "branch", "develop")
+	html = '''<div class="page-container">
+				<div class="page-content">
+				<div class="edit-container text-center">
+					<i class="fa fa-smile text-muted"></i>
+					<a class="edit text-muted" href="{source_link}/blob/{branch}/{target}">
+						Improve this page
+					</a>
+				</div>
+				</div>
+			</div>'''.format(source_link=source_link, app_name=app_name, target=target, branch=branch)
+	return html
+
+
 class HelpDatabase(object):
 	def __init__(self):
 		self.global_help_setup = frappe.conf.get('global_help_setup')
@@ -157,7 +174,6 @@ class HelpDatabase(object):
 		return intro
 
 	def make_content(self, html, path, relpath):
-
 		if '<h1>' in html:
 			html = html.split('</h1>', 1)[1]
 
@@ -166,29 +182,12 @@ class HelpDatabase(object):
 
 		target = path.split('/', 3)[-1]
 		app_name = path.split('/', 3)[2]
-		html += '''
-			<div class="page-container">
-				<div class="page-content">
-				<div class="edit-container text-center">
-					<i class="fa fa-smile text-muted"></i>
-					<a class="edit text-muted" href="https://github.com/frappe/{app_name}/blob/develop/{target}">
-						Improve this page
-					</a>
-				</div>
-				</div>
-			</div>'''.format(app_name=app_name, target=target)
+		html += get_improve_page_html(app_name, target)
 
 		soup = BeautifulSoup(html, 'html.parser')
 
-		for link in soup.find_all('a'):
-			if link.has_attr('href'):
-				url = link['href']
-				if '/user' in url:
-					data_path = url[url.index('/user'):]
-					if '.' in data_path:
-						data_path = data_path[: data_path.rindex('.')]
-					if data_path:
-						link['data-path'] = data_path.replace("user", app_name)
+		self.fix_links(soup, app_name)
+		self.fix_images(soup, app_name)
 
 		parent = self.get_parent(relpath)
 		if parent:
@@ -199,6 +198,24 @@ class HelpDatabase(object):
 			soup.find().insert_before(parent_tag)
 
 		return soup.prettify()
+
+	def fix_links(self, soup, app_name):
+		for link in soup.find_all('a'):
+			if link.has_attr('href'):
+				url = link['href']
+				if '/user' in url:
+					data_path = url[url.index('/user'):]
+					if '.' in data_path:
+						data_path = data_path[: data_path.rindex('.')]
+					if data_path:
+						link['data-path'] = data_path.replace("user", app_name)
+
+	def fix_images(self, soup, app_name):
+		for img in soup.find_all('img'):
+			if img.has_attr('src'):
+				url = img['src']
+				if '/docs/' in url:
+					img['src'] = url.replace('/docs/', '/assets/{0}_docs/'.format(app_name))
 
 	def build_index(self):
 		for data in self.db.sql('select path, full_path, content from help'):

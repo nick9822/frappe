@@ -209,7 +209,8 @@ frappe.PermissionEngine = Class.extend({
 			var perm_cell = me.add_cell(row, d, "permissions").css("padding-top", 0);
 			var perm_container = $("<div class='row'></div>").appendTo(perm_cell);
 
-			$.each(me.rights, function(i, r) {
+			me.rights.forEach(r => {
+				if (!d.is_submittable && ['submit', 'cancel', 'amend'].includes(r)) return;
 				me.add_check(perm_container, d, r);
 			});
 
