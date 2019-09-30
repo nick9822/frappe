@@ -28,7 +28,6 @@ def upload():
 	# get record details
 	dt = frappe.form_dict.doctype
 	dn = frappe.form_dict.docname
-	df = frappe.form_dict.docfield
 	file_url = frappe.form_dict.file_url
 	filename = frappe.form_dict.filename
 	frappe.form_dict.is_private = cint(frappe.form_dict.is_private)
@@ -79,7 +78,7 @@ def get_file_doc(dt=None, dn=None, folder=None, is_private=None, df=None):
 def save_uploaded(dt, dn, folder, is_private, df=None):
 	fname, content = get_uploaded_content()
 	if content:
-		return save_file(fname, content, dt, dn, folder, is_private=is_private, df=df);
+		return save_file(fname, content, dt, dn, folder, is_private=is_private, df=df)
 	else:
 		raise Exception
 
@@ -151,7 +150,7 @@ def save_file(fname, content, dt, dn, folder=None, decode=False, is_private=0, d
 		"folder": folder,
 		"file_size": file_size,
 		"content_hash": content_hash,
-		"is_private": cint(is_private)
+		"is_private": is_private
 	})
 
 	f = frappe.get_doc(file_data)
@@ -165,10 +164,7 @@ def save_file(fname, content, dt, dn, folder=None, decode=False, is_private=0, d
 
 
 def get_file_data_from_hash(content_hash, is_private=0):
-	for name in frappe.db.sql_list("""SELECT `name`
-		FROM `tabFile`
-		WHERE `content_hash`=%s
-		AND `is_private`=%s""", (content_hash, cint(is_private))):
+	for name in frappe.db.sql_list("select name from `tabFile` where content_hash=%s and is_private=%s", (content_hash, is_private)):
 		b = frappe.get_doc('File', name)
 		return {k: b.get(k) for k in frappe.get_hooks()['write_file_keys']}
 	return False
@@ -226,7 +222,7 @@ def remove_all(dt, dn, from_delete=False):
 			attached_to_doctype=%s and attached_to_name=%s""", (dt, dn)):
 			remove_file(fid, dt, dn, from_delete)
 	except Exception as e:
-		if not frappe.db.is_missing_column(e): raise # (temp till for patched)
+		if e.args[0]!=1054: raise # (temp till for patched)
 
 
 def remove_file_by_url(file_url, doctype=None, name=None):
@@ -433,7 +429,7 @@ def get_random_filename(extn=None, content_type=None):
 
 	return random_string(7) + (extn or "")
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def validate_filename(filename):
 	from frappe.utils import now_datetime
 	timestamp = now_datetime().strftime(" %Y-%m-%d %H:%M:%S")

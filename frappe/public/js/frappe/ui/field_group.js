@@ -24,7 +24,13 @@ frappe.ui.FieldGroup = frappe.ui.form.Layout.extend({
 			// set default
 			$.each(this.fields_list, function(i, field) {
 				if (field.df["default"]) {
-					field.set_input(field.df["default"]);
+					let def_value = field.df["default"];
+
+					if (def_value == 'Today' && field.df["fieldtype"] == 'Date') {
+						def_value = frappe.datetime.get_today();
+					}
+
+					field.set_input(def_value);
 					// if default and has depends_on, render its fields.
 					me.refresh_dependency();
 				}
@@ -57,7 +63,7 @@ frappe.ui.FieldGroup = frappe.ui.form.Layout.extend({
 	},
 	catch_enter_as_submit: function() {
 		var me = this;
-		$(this.body).find('input[type="text"], input[type="password"]').keypress(function(e) {
+		$(this.body).find('input[type="text"], input[type="password"], select').keypress(function(e) {
 			if(e.which==13) {
 				if(me.has_primary_action) {
 					e.preventDefault();

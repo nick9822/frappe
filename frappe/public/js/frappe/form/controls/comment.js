@@ -1,4 +1,7 @@
-import 'quill-mention';
+import Quill from 'quill';
+import Mention from './quill-mention/quill.mention';
+
+Quill.register('modules/mention', Mention);
 
 frappe.ui.form.ControlComment = frappe.ui.form.ControlTextEditor.extend({
 	make_wrapper() {
@@ -57,7 +60,7 @@ frappe.ui.form.ControlComment = frappe.ui.form.ControlTextEditor.extend({
 
 	update_state() {
 		const value = this.get_value();
-		if (strip_html(value)) {
+		if (strip_html(value).trim() != "") {
 			this.button.removeClass('btn-default').addClass('btn-primary');
 		} else {
 			this.button.addClass('btn-default').removeClass('btn-primary');
@@ -79,18 +82,13 @@ frappe.ui.form.ControlComment = frappe.ui.form.ControlTextEditor.extend({
 			return null;
 		}
 
-		const at_values = this.mentions.map((value, i) => {
-			return {
-				id: i,
-				value
-			};
-		});
+		const at_values = this.mentions.slice();
 
 		return {
 			allowedChars: /^[A-Za-z0-9_]*$/,
 			mentionDenotationChars: ["@"],
 			isolateCharacter: true,
-			source: function(searchTerm, renderList, mentionChar) {
+			source: function (searchTerm, renderList, mentionChar) {
 				let values;
 
 				if (mentionChar === "@") {
@@ -121,4 +119,8 @@ frappe.ui.form.ControlComment = frappe.ui.form.ControlTextEditor.extend({
 			['clean']
 		];
 	},
+
+	clear() {
+		this.quill.setText('');
+	}
 });

@@ -1,6 +1,6 @@
 boto3
 chardet
-dropbox==7.3.1
+dropbox==9.1.0
 gunicorn
 jinja2
 markdown2==2.3.5
@@ -13,9 +13,9 @@ werkzeug
 semantic_version
 rauth>=0.6.2
 requests
-redis
+redis==2.10.6
 selenium
-babel
+babel==2.6.0
 ipython
 html2text==2016.9.19
 email_reply_parser
@@ -35,6 +35,7 @@ pyasn1
 zxcvbn-python
 unittest-xml-reporting
 oauthlib
+requests-oauthlib
 pdfkit
 PyJWT
 PyPDF2
@@ -44,7 +45,7 @@ pyqrcode
 pypng
 premailer
 croniter
-googlemaps
+googlemaps==3.1.1
 braintree
 future
 passlib
@@ -54,5 +55,12 @@ google-auth-httplib2
 google-auth-oauthlib
 faker
 stripe
-psycopg2-binary
 coverage
+urllib3
+GitPython==2.1.11
+psycopg2==2.7.5
+psycopg2-binary==2.7.5
+sqlparse==0.2.4
+Pygments==2.2.0
+frontmatter
+PyYAML==3.13

@@ -18,6 +18,7 @@ from time import time
 from frappe.utils import now, getdate, cast_fieldtype
 from frappe.utils.background_jobs import execute_job, get_queue
 from frappe.model.utils.link_count import flush_local_link_count
+from frappe.utils import cint
 
 # imports - compatibility imports
 from six import (
@@ -45,9 +46,10 @@ class Database(object):
 	class InvalidColumnName(frappe.ValidationError): pass
 
 
-	def __init__(self, host=None, user=None, password=None, ac_name=None, use_default=0):
+	def __init__(self, host=None, user=None, password=None, ac_name=None, use_default=0, port=None):
 		self.setup_type_map()
 		self.host = host or frappe.conf.db_host or 'localhost'
+		self.port = port or frappe.conf.db_port or ''
 		self.user = user or frappe.conf.db_name
 		self.db_name = frappe.conf.db_name
 		self._conn = None
@@ -138,7 +140,7 @@ class Database(object):
 				if not isinstance(values, (dict, tuple, list)):
 					values = (values,)
 
-				if debug:
+				if debug and query.strip().lower().startswith('select'):
 					try:
 						if explain:
 							self.explain_query(query, values)
@@ -152,6 +154,10 @@ class Database(object):
 					frappe.log(values)
 					frappe.log(">>>>")
 				self._cursor.execute(query, values)
+
+				if frappe.flags.in_migrate:
+					self.log_touched_tables(query, values)
+
 			else:
 				if debug:
 					if explain:
@@ -164,13 +170,21 @@ class Database(object):
 
 				self._cursor.execute(query)
 
+				if frappe.flags.in_migrate:
+					self.log_touched_tables(query)
+
 			if debug:
 				time_end = time()
 				frappe.errprint(("Execution time: {0} sec").format(round(time_end - time_start, 2)))
 
 		except Exception as e:
-			if(frappe.conf.db_type == 'postgres'):
+			if frappe.conf.db_type == 'postgres':
 				self.rollback()
+
+			elif self.is_syntax_error(e):
+				# only for mariadb
+				frappe.errprint('Syntax error in query:')
+				frappe.errprint(query)
 
 			if ignore_ddl and (self.is_missing_column(e) or self.is_missing_table(e) or self.cant_drop_field_or_key(e)):
 				pass
@@ -538,9 +552,13 @@ class Database(object):
 			`tabSingles` where `doctype`=%s and `field`=%s""", (doctype, fieldname))
 		val = val[0][0] if val else None
 
-		if val=="0" or val=="1":
-			# check type
-			val = int(val)
+		df = frappe.get_meta(doctype).get_field(fieldname)
+
+		if not df:
+			frappe.throw(_('Invalid field name: {0}').format(frappe.bold(fieldname)), self.InvalidColumnName)
+
+		if df.fieldtype in frappe.model.numeric_fieldtypes:
+			val = cint(val)
 
 		self.value_cache[doctype][fieldname] = val
 
@@ -589,7 +607,7 @@ class Database(object):
 		"""Update multiple values. Alias for `set_value`."""
 		return self.set_value(*args, **kwargs)
 
-	def set_value(self, dt, dn, field, val, modified=None, modified_by=None,
+	def set_value(self, dt, dn, field, val=None, modified=None, modified_by=None,
 		update_modified=True, debug=False):
 		"""Set a single value in the database, do not call the ORM triggers
 		but update the modified timestamp (unless specified not to).
@@ -716,6 +734,7 @@ class Database(object):
 	def commit(self):
 		"""Commit current transaction. Calls SQL `COMMIT`."""
 		self.sql("commit")
+
 		frappe.local.rollback_observers = []
 		self.flush_realtime_log()
 		enqueue_jobs_after_commit()
@@ -739,7 +758,10 @@ class Database(object):
 
 	def field_exists(self, dt, fn):
 		"""Return true of field exists."""
-		return self.sql("select name from tabDocField where fieldname=%s and parent=%s", (dt, fn))
+		return self.exists('DocField', {
+			'fieldname': fn,
+			'parent': dt
+		})
 
 	def table_exists(self, doctype):
 		"""Returns True if table for given doctype exists."""
@@ -832,7 +854,7 @@ class Database(object):
 		"""Returns list of column names from given doctype."""
 		columns = self.get_db_table_columns('tab' + doctype)
 		if not columns:
-			raise self.ProgrammingError
+			raise self.TableMissingError
 		return columns
 
 	def has_column(self, doctype, column):
@@ -878,17 +900,26 @@ class Database(object):
 		# implemented in specific class
 		pass
 
+	@staticmethod
+	def is_column_missing(e):
+		return frappe.db.is_missing_column(e)
+
 	def get_descendants(self, doctype, name):
 		'''Return descendants of the current record'''
-		lft, rgt = self.get_value(doctype, name, ('lft', 'rgt'))
-		return self.sql_list('''select name from `tab{doctype}`
-			where lft > {lft} and rgt < {rgt}'''.format(doctype=doctype, lft=lft, rgt=rgt))
+		node_location_indexes = self.get_value(doctype, name, ('lft', 'rgt'))
+		if node_location_indexes:
+			lft, rgt = node_location_indexes
+			return self.sql_list('''select name from `tab{doctype}`
+				where lft > {lft} and rgt < {rgt}'''.format(doctype=doctype, lft=lft, rgt=rgt))
+		else:
+			# when document does not exist
+			return []
 
 	def is_missing_table_or_column(self, e):
 		return self.is_missing_column(e) or self.is_missing_table(e)
 
 	def multisql(self, sql_dict, values=(), **kwargs):
-		current_dialect = frappe.conf.db_type or 'mariadb'
+		current_dialect = frappe.db.db_type or 'mariadb'
 		query = sql_dict.get(current_dialect)
 		return self.sql(query, values, **kwargs)
 
@@ -900,7 +931,35 @@ class Database(object):
 				conditions=conditions
 			), values)
 		else:
-			frappe.throw('No conditions provided')
+			frappe.throw(_('No conditions provided'))
+
+	def log_touched_tables(self, query, values=None):
+		if values:
+			query = frappe.safe_decode(self._cursor.mogrify(query, values))
+		if query.strip().lower().split()[0] in ('insert', 'delete', 'update', 'alter'):
+			# single_word_regex is designed to match following patterns
+			# `tabXxx`, tabXxx and "tabXxx"
+
+			# multi_word_regex is designed to match following patterns
+			# `tabXxx Xxx` and "tabXxx Xxx"
+
+			# ([`"]?) Captures " or ` at the begining of the table name (if provided)
+			# \1 matches the first captured group (quote character) at the end of the table name
+			# multi word table name must have surrounding quotes.
+
+			# (tab([A-Z]\w+)( [A-Z]\w+)*) Captures table names that start with "tab"
+			# and are continued with multiple words that start with a captital letter
+			# e.g. 'tabXxx' or 'tabXxx Xxx' or 'tabXxx Xxx Xxx' and so on
+
+			single_word_regex = r'([`"]?)(tab([A-Z]\w+))\1'
+			multi_word_regex = r'([`"])(tab([A-Z]\w+)( [A-Z]\w+)+)\1'
+			tables = []
+			for regex in (single_word_regex, multi_word_regex):
+				tables += [groups[1] for groups in re.findall(regex, query)]
+
+			if frappe.flags.touched_tables is None:
+				frappe.flags.touched_tables = set()
+			frappe.flags.touched_tables.update(tables)
 
 
 def enqueue_jobs_after_commit():

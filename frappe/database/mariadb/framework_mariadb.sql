@@ -37,6 +37,7 @@ CREATE TABLE `tabDocField` (
   `unique` int(1) NOT NULL DEFAULT 0,
   `no_copy` int(1) NOT NULL DEFAULT 0,
   `allow_on_submit` int(1) NOT NULL DEFAULT 0,
+  `show_preview_popup` int(1) NOT NULL DEFAULT 0,
   `trigger` varchar(255) DEFAULT NULL,
   `collapsible_depends_on` text,
   `depends_on` text,
@@ -49,6 +50,7 @@ CREATE TABLE `tabDocField` (
   `description` text,
   `in_list_view` int(1) NOT NULL DEFAULT 0,
   `in_standard_filter` int(1) NOT NULL DEFAULT 0,
+  `in_preview` int(1) NOT NULL DEFAULT 0,
   `read_only` int(1) NOT NULL DEFAULT 0,
   `precision` varchar(255) DEFAULT NULL,
   `length` int(11) NOT NULL DEFAULT 0,
@@ -103,7 +105,7 @@ CREATE TABLE `tabDocPerm` (
 
 DROP TABLE IF EXISTS `tabDocType`;
 CREATE TABLE `tabDocType` (
-  `name` varchar(255) NOT NULL DEFAULT '',
+  `name` varchar(255) NOT NULL,
   `creation` datetime(6) DEFAULT NULL,
   `modified` datetime(6) DEFAULT NULL,
   `modified_by` varchar(255) DEFAULT NULL,
@@ -115,6 +117,7 @@ CREATE TABLE `tabDocType` (
   `idx` int(8) NOT NULL DEFAULT 0,
   `search_fields` varchar(255) DEFAULT NULL,
   `issingle` int(1) NOT NULL DEFAULT 0,
+  `is_tree` int(1) NOT NULL DEFAULT 0,
   `istable` int(1) NOT NULL DEFAULT 0,
   `editable_grid` int(1) NOT NULL DEFAULT 1,
   `track_changes` int(1) NOT NULL DEFAULT 0,
@@ -139,11 +142,9 @@ CREATE TABLE `tabDocType` (
   `allow_rename` int(1) NOT NULL DEFAULT 0,
   `allow_import` int(1) NOT NULL DEFAULT 0,
   `hide_toolbar` int(1) NOT NULL DEFAULT 0,
-  `hide_heading` int(1) NOT NULL DEFAULT 0,
   `track_seen` int(1) NOT NULL DEFAULT 0,
   `max_attachments` int(11) NOT NULL DEFAULT 0,
   `print_outline` varchar(255) DEFAULT NULL,
-  `read_only_onload` int(1) NOT NULL DEFAULT 0,
   `document_type` varchar(255) DEFAULT NULL,
   `icon` varchar(255) DEFAULT NULL,
   `color` varchar(255) DEFAULT NULL,
@@ -157,7 +158,6 @@ CREATE TABLE `tabDocType` (
   `_user_tags` varchar(255) DEFAULT NULL,
   `custom` int(1) NOT NULL DEFAULT 0,
   `beta` int(1) NOT NULL DEFAULT 0,
-  `image_view` int(1) NOT NULL DEFAULT 0,
   `has_web_view` int(1) NOT NULL DEFAULT 0,
   `allow_guest_to_view` int(1) NOT NULL DEFAULT 0,
   `route` varchar(255) DEFAULT NULL,
@@ -173,7 +173,8 @@ CREATE TABLE `tabDocType` (
 DROP TABLE IF EXISTS `tabSeries`;
 CREATE TABLE `tabSeries` (
   `name` varchar(100) DEFAULT NULL,
-  `current` int(10) NOT NULL DEFAULT 0
+  `current` int(10) NOT NULL DEFAULT 0,
+  PRIMARY KEY(`name`)
 ) ENGINE=InnoDB ROW_FORMAT=COMPRESSED CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

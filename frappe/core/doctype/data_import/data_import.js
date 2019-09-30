@@ -36,6 +36,12 @@ frappe.ui.form.on('Data Import', {
 		});
 	},
 
+	reference_doctype: function(frm){
+		if (frm.doc.reference_doctype) {
+			frappe.model.with_doctype(frm.doc.reference_doctype);
+		}
+	},
+
 	refresh: function(frm) {
 		frm.disable_save();
 		frm.dashboard.clear_headline();
@@ -78,6 +84,7 @@ frappe.ui.form.on('Data Import', {
 			frm.doc.docstatus === 0 && (!frm.doc.import_status || frm.doc.import_status == "Failed")) {
 			frm.page.set_primary_action(__("Start Import"), function() {
 				frappe.call({
+					btn: frm.page.btn_primary,
 					method: "frappe.core.doctype.data_import.data_import.import_data",
 					args: {
 						data_import: frm.doc.name
@@ -201,6 +208,13 @@ frappe.data_import.download_dialog = function(frm) {
 			"default": "Excel"
 		},
 		{
+			"label": __("Download with Data"),
+			"fieldname": "with_data",
+			"fieldtype": "Check",
+			"hidden": !frm.doc.overwrite,
+			"default": 1
+		},
+		{
 			"label": __("Select All"),
 			"fieldname": "select_all",
 			"fieldtype": "Button",
@@ -270,7 +284,7 @@ frappe.data_import.download_dialog = function(frm) {
 						doctype: frm.doc.reference_doctype,
 						parent_doctype: frm.doc.reference_doctype,
 						select_columns: JSON.stringify(columns),
-						with_data: frm.doc.overwrite,
+						with_data: frm.doc.overwrite && data.with_data,
 						all_doctypes: true,
 						file_type: data.file_type,
 						template: true

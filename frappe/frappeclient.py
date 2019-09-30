@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 import requests
 import json
 import frappe
@@ -39,7 +39,7 @@ class FrappeClient(object):
 			'pwd': password
 		}, verify=self.verify, headers=self.headers)
 
-		if r.status_code==200 and r.json().get('message') == "Logged In":
+		if r.status_code==200 and r.json().get('message') in ("Logged In", "No App"):
 			return r.json()
 		else:
 			print(r.text)

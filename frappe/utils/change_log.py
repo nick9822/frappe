@@ -9,9 +9,9 @@ import frappe
 import requests
 import subprocess # nosec
 from frappe.utils import cstr
-from frappe.utils.gitutils import get_app_last_commit_ref, get_app_branch
-import subprocess # nosec
+from frappe.utils.gitutils import get_app_branch
 from frappe import _, safe_decode
+
 
 def get_change_log(user=None):
 	if not user: user = frappe.session.user
@@ -123,7 +123,7 @@ def get_app_branch(app):
 		result = safe_decode(result)
 		result = result.strip()
 		return result
-	except Exception as e:
+	except Exception:
 		return ''
 
 def get_app_last_commit_ref(app):
@@ -133,12 +133,12 @@ def get_app_last_commit_ref(app):
 		result = safe_decode(result)
 		result = result.strip()
 		return result
-	except Exception as e:
+	except Exception:
 		return ''
 
 def check_for_update():
 	updates = frappe._dict(major=[], minor=[], patch=[])
-	apps    = get_versions()
+	apps = get_versions()
 
 	for app in apps:
 		app_details = check_release_on_github(app)
@@ -146,7 +146,9 @@ def check_for_update():
 
 		github_version, org_name = app_details
 		# Get local instance's current version or the app
-		instance_version = Version(apps[app]['version'])
+
+		branch_version = apps[app]['branch_version'].split(' ')[0] if apps[app].get('branch_version', '') else ''
+		instance_version = Version(branch_version or apps[app].get('version'))
 		# Compare and popup update message
 		for update_type in updates:
 			if github_version.__dict__[update_type] > instance_version.__dict__[update_type]:
@@ -158,6 +160,7 @@ def check_for_update():
 					title             = apps[app]['title'],
 				))
 				break
+			if github_version.__dict__[update_type] < instance_version.__dict__[update_type]: break
 
 	add_message_to_redis(updates)
 

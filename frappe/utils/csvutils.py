@@ -30,7 +30,7 @@ def read_csv_content_from_attached_file(doc):
 		raise Exception
 
 	try:
-		_file = frappe.get_doc("File", {"file_name": fileid})
+		_file = frappe.get_doc("File", fileid)
 		fcontent = _file.get_content()
 		return read_csv_content(fcontent, frappe.form_dict.get('ignore_encoding_errors'))
 	except Exception:
@@ -100,6 +100,10 @@ def to_csv(data):
 
 	return writer.getvalue()
 
+def build_csv_response(data, filename):
+	frappe.response["result"] = cstr(to_csv(data))
+	frappe.response["doctype"] = filename
+	frappe.response["type"] = "csv"
 
 class UnicodeWriter:
 	def __init__(self, encoding="utf-8"):
